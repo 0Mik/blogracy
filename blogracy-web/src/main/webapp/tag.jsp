@@ -16,17 +16,8 @@ if (userHash == null || userHash.length() == 0) {
 } else if (userHash.length() != 32) {
 	  userHash = Hashes.hash(userHash); // TODO: remove
 }
-
-String topic = request.getParameter("channel");
-if(topic != null){
-	if(userHash.equals(localUserHash)){
-		ChatTopicController.getSingleton().insertTopicChannel(topic);
-	}
-	else{
-		ChatTopicController.getSingleton().insertFollowersChannel(userHash, topic);
-	}
-}
-
+String tag = request.getParameter("tag");
+String tagHash = Hashes.newHash(tag).toString();
 String channel = ChatController.getPrivateChannel(localUserHash, userHash);
 //ChatController.getSingleton().joinChannel(channel);
 
@@ -34,8 +25,8 @@ pageContext.setAttribute("localUserHash",  localUserHash);
 pageContext.setAttribute("userHash", userHash);
 pageContext.setAttribute("application", "Blogracy");
 pageContext.setAttribute("user", Users.newUser(Hashes.fromString(userHash)));
-pageContext.setAttribute("feed", ActivitiesController.getFeed(userHash, 1, null));
-pageContext.setAttribute("channels", ChatTopicController.getSingleton().getUserTopicActivity(userHash, null));
+pageContext.setAttribute("topic", ChatTopicController.getSingleton().getTopicActivity(tag));
+pageContext.setAttribute("channel",tag);
 pageContext.setAttribute("friends", Configurations.getUserConfig().getFriends());
 pageContext.setAttribute("tags", ChatTopicController.getSingleton().getUserChannels(userHash));
 pageContext.setAttribute("localUser", Configurations.getUserConfig().getUser());
@@ -193,20 +184,13 @@ pageContext.setAttribute("publicChannel", userHash);
 
         <div class="row">
             <div class="span10">
-                <h2>Messages</h2>
+                <h2>Topic: ${channel}</h2>
                 <ul>
-                    <c:forEach var="entry" items="${feed}">
+                    <c:forEach var="entry" items="${topic}">
                     <li>${entry.content}</li>
                     </c:forEach>
                 </ul>
-                
-                <h2>Channels</h2>
-                <ul>
-                    <c:forEach var="entry" items="${channels}">
-                    <li>${entry.content}</li>
-                    </c:forEach>
-                </ul>
-					
+                	
                 <h2>New message</h2>
                 <form class="span10" id="message-send">
                     <input type="hidden" name="user" value="${user.hash}" />
@@ -233,7 +217,6 @@ pageContext.setAttribute("publicChannel", userHash);
                         </div>
                     </fieldset>
                 </form>
-                
                 <h2>New topic</h2>
                 <form class="span10" action="topicChat.jsp?channel=document.getElementById("topicArea").value&nick=${localUser.localNick}" >
                 	<fieldset class="form-stacked">
@@ -248,24 +231,6 @@ pageContext.setAttribute("publicChannel", userHash);
                         <div class="actions">
                         	<input type="hidden" name="nick" id ="nickname" value="${localUser.localNick}"  />
                             <input type="submit" value="Create topic chat" />
-                        </div>
-                    </fieldset>
-                </form>
-                
-                <h2>Join topic</h2>
-                <form class="span10" action="user.jsp?channel=document.getElementById("joinArea").value&user=${localUser.localNick}" >
-                	<fieldset class="form-stacked">
-                    	    <div class="clearfix">
-                        	    <label for="joinArea">Insert a topic</label>
-                            <div class="input">
-                                <textarea class="xxlarge" name="channel" id="joinArea" rows="1"></textarea>
-                            </div>
-                        </div>
-                    </fieldset>
-                    <fieldset>
-                        <div class="actions">
-                        	<input type="hidden" name="nick" id ="nickname" value="${localUser.localNick}"  />
-                            <input type="submit" value="Join topic" />
                         </div>
                     </fieldset>
                 </form>

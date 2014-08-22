@@ -26,8 +26,8 @@ public class ChatController {
     private MessageProducer producer;
     private static final String TOPIC_NAME = "CHAT.DEMO";
 
-    private String localUser;
-    private String remoteUser;
+    public String localUser;
+    public String remoteUser;
 
     private static final ChatController theInstance = new ChatController();
 
@@ -64,7 +64,7 @@ public class ChatController {
     }
 
     public void sendMessage(String channel, String text) {
-        System.out.println("Creating chat channel: " + channel);
+        System.out.println("Sending message to the chat channel: " + channel);
         try {
             TextMessage msg = session.createTextMessage();
             msg.setText("<message type=\"chat\" from=\"" + localUser

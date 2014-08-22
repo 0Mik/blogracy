@@ -60,6 +60,8 @@ public class Configurations {
     private static final String USER_FILE = "blogracyUser.properties";
     private static final String BLOGRACY_USER_USER = "blogracy.user.user";
     private static final String BLOGRACY_USER_FRIENDS = "blogracy.user.friends";
+    //aggregator peer configurations
+    private static final String USER_PEER_FILE = "blogracyUserPeer.properties";
 
     static private Properties loadProperties(String file) throws IOException {
         InputStream is = getResourceAsStream(file);
@@ -161,7 +163,11 @@ public class Configurations {
             return new UserConfig() {
                 // TODO: this should absolutely come from the outside!
                 Properties userProperties = loadProperties(USER_FILE);
-
+                /*
+                 * uncomment this and comment the prev row if you want to start
+                *  an aggregator peer
+                */
+                //Properties userProperties = loadProperties(USER_PEER_FILE);
                 @Override
                 public User getUser() {
                     String userRow = userProperties
@@ -212,6 +218,7 @@ public class Configurations {
                     KeyPair result = null;
                     try {
                         String alias = getUser().getLocalNick();
+                        
                         char[] password = new char[] { 'b', 'l', 'o', 'g', 'r',
                                 'a', 'c', 'y' };
                         InputStream is = getResourceAsStream("blogracy.jks");
@@ -221,6 +228,7 @@ public class Configurations {
                         is.close();
                         // Get private key
                         Key key = keyStore.getKey(alias, password);
+                     
                         if (key instanceof PrivateKey) {
                             // Get certificate of public key
                             java.security.cert.Certificate cert = keyStore
@@ -231,7 +239,9 @@ public class Configurations {
 
                             // Return a key pair
                             result = new KeyPair(publicKey, (PrivateKey) key);
+                            
                         }
+                        
                     } catch (UnrecoverableKeyException e) {
                         e.printStackTrace();
                     } catch (NoSuchAlgorithmException e) {

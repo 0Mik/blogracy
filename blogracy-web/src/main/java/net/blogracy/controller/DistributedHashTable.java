@@ -53,12 +53,14 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 
 import net.blogracy.config.Configurations;
+import net.blogracy.model.hashes.Hashes;
 import net.blogracy.util.JsonWebSignature;
 
 import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.shindig.protocol.conversion.BeanConverter;
 import org.apache.shindig.protocol.conversion.BeanJsonConverter;
+import org.apache.shindig.social.opensocial.model.ActivityEntry;
 import org.apache.shindig.social.opensocial.model.Album;
 import org.apache.shindig.social.opensocial.model.MediaItem;
 import org.json.JSONArray;
@@ -177,7 +179,20 @@ public class DistributedHashTable {
 
     private HashMap<String, JSONObject> records = new HashMap<String, JSONObject>();
     private Logger log;
+    
+    private static BeanJsonConverter CONVERTER = new BeanJsonConverter(
+            Guice.createInjector(new Module() {
+                @Override
+                public void configure(Binder b) {
+                    b.bind(BeanConverter.class)
+                            .annotatedWith(
+                                    Names.named("shindig.bean.converter.json"))
+                            .to(BeanJsonConverter.class);
+                }
+            }));
 
+    
+    
     private static final DistributedHashTable theInstance = new DistributedHashTable();
 
     public static DistributedHashTable getSingleton() {
@@ -277,32 +292,124 @@ public class DistributedHashTable {
     }
 
     public void putRecord(JSONObject record) {
-        try {
-            String id = record.getString("id");
-            JSONObject old = records.get(id);
-            if (old == null
-                    || record.getString("version").compareTo(
-                            old.getString("version")) > 0) {
-                records.put(id, record);
+        
+            String id = null;
+			try {
+				id = record.getString("id");
+			} catch (JSONException e2) {
+				e2.printStackTrace();
+			}
+            //checking if is a feed from an aggregator peer
+            if(ChatTopicController.getSingleton().aggregatorsID.containsKey(id)){
+            	String channel = ChatTopicController.getSingleton().aggregatorsID.get(id);
+            	String channelHash = Hashes.newHash(channel).toString();
+            	insertTopicActivities(channel, channelHash, record);
             }
-        } catch (JSONException e1) {
-            e1.printStackTrace();
+            else{
+            	try {
+            		JSONObject old = records.get(id);
+            		if (old == null
+            				|| record.getString("version").compareTo(
+            						old.getString("version")) > 0) {
+            			records.put(id, record);
+            		}
+            	} catch (JSONException e1) {
+            		e1.printStackTrace();
+            	}
+            	JSONArray recordList = new JSONArray();
+            	Iterator<JSONObject> entries = records.values().iterator();
+            	while (entries.hasNext()) {
+            		JSONObject entry = entries.next();
+            		recordList.put(entry);
+            	}
+            	File recordsFile = new File(CACHE_FOLDER + File.separator
+            			+ "records.json");
+            	try {
+            		FileWriter writer = new FileWriter(recordsFile);
+            		recordList.write(writer);
+            		writer.close();
+            	} catch (IOException e) {
+            		e.printStackTrace();
+            	} catch (JSONException e) {
+            		e.printStackTrace();
+            	}
+            }
+    }
+    
+    public boolean checkActivityEntry(String message, String channel){
+    	boolean isPresent = false;
+    	JSONObject record = getRecord(channel);
+        if (record != null) {
+            try {
+                String latestHash = FileSharing.getHashFromMagnetURI(record
+                        .getString("uri"));
+                File dbFile = new File(CACHE_FOLDER + File.separator
+                        + latestHash + ".json");
+                if (!dbFile.exists() && record.has("prev")) {
+                    latestHash = FileSharing.getHashFromMagnetURI(record
+                            .getString("prev"));
+                    dbFile = new File(CACHE_FOLDER + File.separator
+                            + latestHash + ".json");
+                }
+                if (dbFile.exists()) {
+                    JSONObject db = new JSONObject(new JSONTokener(
+                            new FileReader(dbFile)));
+
+                    JSONArray items = db.getJSONArray("items");
+                    for (int i = 0; i < items.length(); ++i) {
+                        JSONObject item = items.getJSONObject(i);
+                        ActivityEntry entry = (ActivityEntry) CONVERTER
+                                .convertToObject(item, ActivityEntry.class);
+                        if(entry.getContent().equals(message)){
+                        	//exit immediately
+                        	isPresent = true;
+                        	return isPresent;
+                        }
+                    }
+                } else {
+                    System.out.println("Feed not found");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
-        JSONArray recordList = new JSONArray();
-        Iterator<JSONObject> entries = records.values().iterator();
-        while (entries.hasNext()) {
-            JSONObject entry = entries.next();
-            recordList.put(entry);
-        }
-        File recordsFile = new File(CACHE_FOLDER + File.separator
-                + "records.json");
-        try {
-            FileWriter writer = new FileWriter(recordsFile);
-            recordList.write(writer);
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (JSONException e) {
+    	return isPresent;
+    }
+    
+    public void insertTopicActivities(String channel, String channelHash, JSONObject record){
+    	try {
+    		String topicHash = FileSharing.getHashFromMagnetURI(record
+    				.getString("uri"));
+    		File dbFile = new File(CACHE_FOLDER + File.separator
+    				+ topicHash + ".json");
+    		if (!dbFile.exists() && record.has("prev")) {
+    			
+    			topicHash = FileSharing.getHashFromMagnetURI(record
+    					.getString("prev"));
+    			dbFile = new File(CACHE_FOLDER + File.separator
+    					+ topicHash + ".json");
+    		}
+    		if (dbFile.exists()) {
+    			
+    			JSONObject db = new JSONObject(new JSONTokener(
+                    new FileReader(dbFile)));
+
+    			JSONArray items = db.getJSONArray("items");
+    			for (int i = 0; i < items.length(); ++i) {
+    				JSONObject item = items.getJSONObject(i);
+    				ActivityEntry entry = (ActivityEntry) CONVERTER
+    						.convertToObject(item, ActivityEntry.class);
+    				//checking if message is just present for the channel activity
+    				if(!checkActivityEntry(entry.getContent(), channelHash)){
+    					
+    					ActivitiesController.getSingleton().addFeedEntry(channelHash
+    							, entry.getContent(), null);
+    				}
+    			}
+    		} else {
+    			System.out.println("Feed not found");
+    		}
+    	} catch (Exception e) {
             e.printStackTrace();
         }
     }

@@ -15,12 +15,13 @@ import net.blogracy.controller.FileSharing;
 
 public class FileUpload extends HttpServlet {
 
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+   
+	
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         File attachment = (File) req.getAttribute("userfile");
         String text = req.getParameter("usertext").trim();
-
         FileSharing sharing = FileSharing.getSingleton();
         // String id = sharing.hash("mic");
         String id = Configurations.getUserConfig().getUser().getHash()
@@ -31,7 +32,7 @@ public class FileUpload extends HttpServlet {
         // String dest = req.getParameter("user");
         ActivitiesController activities = ActivitiesController.getSingleton();
         activities.addFeedEntry(id, text, attachment);
-
+        
         PrintWriter outp = resp.getWriter();
         outp.write("<html>");
         outp.write("<head><title>FileUpload page</title></head>");

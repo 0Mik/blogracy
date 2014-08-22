@@ -52,6 +52,8 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 
 import net.blogracy.config.Configurations;
+import net.blogracy.model.hashes.Hashes;
+import net.blogracy.model.users.Users;
 import net.blogracy.util.FileUtils;
 
 import org.apache.activemq.ActiveMQConnection;
@@ -111,8 +113,12 @@ public class ActivitiesController {
     public ActivitiesController() {
         ISO_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
-
-    static public List<ActivityEntry> getFeed(String user) {
+    
+    static public List<ActivityEntry> getFeed(String user){
+    	return getFeed(user, 3, null);
+    }
+    
+    static public List<ActivityEntry> getFeed(String user, int isTopic, String Topic) {
         List<ActivityEntry> result = new ArrayList<ActivityEntry>();
         System.out.println("Getting feed: " + user);
         JSONObject record = dht.getRecord(user);
@@ -139,7 +145,37 @@ public class ActivitiesController {
                         JSONObject item = items.getJSONObject(i);
                         ActivityEntry entry = (ActivityEntry) CONVERTER
                                 .convertToObject(item, ActivityEntry.class);
-                        result.add(entry);
+                        //
+                        ArrayList<String> hashtag = 
+                    			ChatTopicController.getSingleton().checkMessageHashtag(entry.getContent());
+                    	if(isTopic == 0){
+                        	//only activity entry with hashtag
+                        	if(hashtag.size() > 0){
+                        		Iterator<String> it = hashtag.iterator();
+                        		while(it.hasNext()){
+                        		
+                        			String channel = it.next();
+                        			if(Topic != null){
+                        				if(channel.equals(Topic))
+                        					result.add(entry);
+                        			}
+                        			else{
+                        			
+                        				result.add(entry);
+                        			}
+                        		}
+                        	}
+                        }
+                        else if (isTopic == 1){
+                        	//only activity entry without hashtag
+                        	if(hashtag.size() == 0)
+                        		result.add(entry);
+                        }
+                        else if ((isTopic == 2)||(isTopic != 2)){
+                        	// all the activity entry
+                        	result.add(entry);
+                        }
+                        
                     }
                     System.out.println("Feed loaded");
                 } else {
@@ -151,10 +187,19 @@ public class ActivitiesController {
         }
         return result;
     }
-
-    public void addFeedEntry(String id, String text, File attachment) {
+    
+    public void addFeedEntry(String id, String text, File attachment){
+    	addFeedEntry(id, text, attachment, false);
+    }
+    
+    public void addFeedEntry(String id, String text, File attachment, boolean isAggregator) {
         try {
-            String hash = sharing.hash(text);
+        	if(id.equals(Configurations.getUserConfig().getUser().getHash().toString())
+        			&& !isAggregator){
+        		
+        		ChatTopicController.getSingleton().createTopicActivity(text);
+        	}
+        	String hash = sharing.hash(text);
             File textFile = new File(CACHE_FOLDER + File.separator + hash
                     + ".txt");
 
@@ -168,12 +213,13 @@ public class ActivitiesController {
                 attachmentUri = sharing.seed(attachment);
             }
 
-            final List<ActivityEntry> feed = getFeed(id);
+            final List<ActivityEntry> feed = getFeed(id, 2, null);
             final ActivityEntry entry = new ActivityEntryImpl();
             entry.setVerb("post");
             entry.setUrl(textUri);
             entry.setPublished(ISO_DATE_FORMAT.format(new Date()));
             entry.setContent(text);
+            
             if (attachment != null) {
                 ActivityObject enclosure = new ActivityObjectImpl();
                 enclosure.setUrl(attachmentUri);
@@ -181,7 +227,7 @@ public class ActivitiesController {
             }
             feed.add(0, entry);
             String feedUri = seedActivityStream(id, feed);
-            DistributedHashTable.getSingleton().store(id, feedUri,
+           	DistributedHashTable.getSingleton().store(id, feedUri,
                     entry.getPublished());
         } catch (Exception e) {
             e.printStackTrace();
@@ -190,9 +236,9 @@ public class ActivitiesController {
 
     public String seedActivityStream(String userId,
             final List<ActivityEntry> feed) throws JSONException, IOException {
-        final File feedFile = new File(CACHE_FOLDER + File.separator + userId
+        File feedFile = new File(CACHE_FOLDER + File.separator + userId
                 + ".json");
-
+        
         JSONArray items = new JSONArray();
         for (int i = 0; i < feed.size(); ++i) {
             JSONObject item = new JSONObject(feed.get(i));
@@ -209,4 +255,7 @@ public class ActivitiesController {
         String feedUri = sharing.seed(feedFile);
         return feedUri;
     }
+
+    
+
 }

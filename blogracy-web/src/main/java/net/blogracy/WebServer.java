@@ -9,11 +9,19 @@ import java.util.logging.Logger;
 import net.blogracy.config.Configurations;
 import net.blogracy.controller.ActivitiesController;
 import net.blogracy.controller.ChatController;
+import net.blogracy.controller.ChatTopicController;
 import net.blogracy.controller.DistributedHashTable;
 import net.blogracy.controller.FileSharing;
+import net.blogracy.model.hashes.Hashes;
 import net.blogracy.model.users.User;
+import net.blogracy.web.FileUpload;
 
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.webapp.WebAppContext;
 
 public class WebServer {
@@ -24,10 +32,11 @@ public class WebServer {
     static final DateFormat ISO_DATE_FORMAT = new SimpleDateFormat(
             "yyyy-MM-dd'T'HH:mm:ss'Z'");
 
-    static final int TOTAL_WAIT = 2 * 60 * 1000; // 2 minutes
+    static final int TOTAL_WAIT = 5 * 60 * 1000; // 5 minutes
 
     public static void main(String[] args) throws Exception {
-        ISO_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+        
+    	ISO_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         int randomWait = (int) (TOTAL_WAIT * Math.random());
         Logger log = Logger.getLogger("net.blogracy.webserver");
@@ -42,12 +51,12 @@ public class WebServer {
         // context.setDescriptor(webDir + "/WEB-INF/web.xml");
         // context.setContextPath("/");
         // context.setParentLoaderPriority(true);
-
+        
         Server server = new Server(8181);
         server.setHandler(context);
         server.start();
         // server.join();
-
+        
         List<User> friends = Configurations.getUserConfig().getFriends();
         for (User friend : friends) {
             String hash = friend.getHash().toString();
@@ -57,18 +66,26 @@ public class WebServer {
                 .toString();
         ChatController.getSingleton().joinChannel(id);
 
+        ActivitiesController.getSingleton().addFeedEntry(id, "#juventus #calcio Morata una belva!", null);
+        ActivitiesController.getSingleton().addFeedEntry(id, "#estate arriva!", null);
+        ActivitiesController.getSingleton().addFeedEntry(id, "a guardare il #fitness", null);
+        
+        
         while (true) {
             ActivitiesController activities = ActivitiesController
                     .getSingleton();
             String now = ISO_DATE_FORMAT.format(new java.util.Date());
             activities.addFeedEntry(id, now + " " + LOREM_IPSUM, null);
-
+            //
             // List<User> friends = Configurations.getUserConfig().getFriends();
             randomWait = (int) (TOTAL_WAIT * (0.8 + 0.4 * Math.random()));
             int wait = randomWait / friends.size();
             for (User friend : friends) {
-                DistributedHashTable.getSingleton().lookup(
+            	DistributedHashTable.getSingleton().lookup(
                         friend.getHash().toString());
+                //
+                ChatTopicController.getSingleton().insertFollowersChannel
+                	(friend.getHash().toString(), "juventus");
                 activities.getFeed(friend.getHash().toString());
                 Thread.currentThread().sleep(wait);
             }

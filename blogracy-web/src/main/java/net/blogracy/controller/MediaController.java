@@ -140,7 +140,7 @@ public class MediaController {
             // Album is empty where created
             album.setMediaItemCount(0);
 
-            final List<ActivityEntry> feed = activities.getFeed(userId);
+            final List<ActivityEntry> feed = activities.getFeed(userId, 2, null);
             final ActivityEntry entry = new ActivityEntryImpl();
             entry.setVerb("create");
             ActivityObject mediaAlbumObject = new ActivityObjectImpl();
@@ -322,7 +322,7 @@ public class MediaController {
         List<String> hashList = new ArrayList<String>();
         List<MediaItem> listOfMediaItems = new ArrayList<MediaItem>();
 
-        final List<ActivityEntry> feed = activities.getFeed(userId);
+        final List<ActivityEntry> feed = activities.getFeed(userId, 2, null);
         final String publishedDate = ISO_DATE_FORMAT.format(new Date());
 
         try {
@@ -490,7 +490,7 @@ public class MediaController {
 
             album.setMediaItemCount(mediaItems.size());
 
-            final List<ActivityEntry> feed = activities.getFeed(userId);
+            final List<ActivityEntry> feed = activities.getFeed(userId, 2, null);
             final ActivityEntry entry = new ActivityEntryImpl();
             entry.setVerb("remove");
             entry.setPublished(ISO_DATE_FORMAT.format(new Date()));
